@@ -45,4 +45,4 @@ htmlcov/
 *.whl
 
 # Misc
-.DS_Store
+.DS_Storesrc/company_research/.env
