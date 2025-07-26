@@ -31,10 +31,8 @@ load_dotenv()
 def google_search(query: str, num_results: int = 2, max_chars: int = 500) -> list:  # type: ignore[type-arg]
 
 
-    # api_key = os.getenv("GOOGLE_API_KEY")
-    # search_engine_id = os.getenv("GOOGLE_SEARCH_ENGINE_ID")
-    api_key = "AIzaSyCd0TT9RcAQ7g_vnqgIofHbcnxsxPXNM_Q"
-    search_engine_id = "067e0da05609646df"
+    api_key = os.getenv("GOOGLE_API_KEY")
+    search_engine_id = os.getenv("GOOGLE_SEARCH_ENGINE_ID")
     if not api_key or not search_engine_id:
         raise ValueError("API key or Search Engine ID not found in environment variables")
 
