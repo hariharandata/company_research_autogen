@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=45", "wheel", "setuptools_scm>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "company_research"
+version = "0.1.0"
+description = "A group of AI agents to do stock and google analysis of a company"
+authors = [
+    { name = "Hariharan Gopinath" },
+]
+requires-python = ">=3.8"
+readme = "README.md"
+license = { text = "MIT" }
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.pytest.ini_options]
+addopts = "-ra -q"
+testpaths = ["tests"]

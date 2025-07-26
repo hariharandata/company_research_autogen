@@ -1,0 +1,25 @@
+version: 1
+disable_existing_loggers: True
+formatters:
+  simple:
+    format: '%(asctime)s.%(msecs)03d [%(threadName)-15s] %(levelname)-8s - %(message)-80s - %(pathname)s:%(lineno)d'
+    datefmt: '%Y-%m-%dT%H:%M:%S'
+handlers:
+  console:
+    class: logging.StreamHandler
+    formatter: simple
+    stream: ext://sys.stdout
+  file:
+    class: logging.handlers.RotatingFileHandler
+    formatter: simple
+    filename: messaging.log
+    maxBytes: 10485760 # 10MB
+    backupCount: 20
+    encoding: utf8
+loggers:
+  simpleExample:
+    handlers: [console,file]
+    propagate: yes
+root:
+  level: DEBUG
+  handlers: [console,file]

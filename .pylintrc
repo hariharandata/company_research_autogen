@@ -1,0 +1,19 @@
+[MESSAGES CONTROL]
+disable=
+    missing-docstring,
+    too-few-public-methods,
+    logging-fstring-interpolation,
+    invalid-name,
+    no-else-raise,
+    fixme,
+    too-many-locals,
+    unnecessary-pass,
+[SIMILARITIES]
+# Configuration for ingnoring code simularities
+min-similarity-lines=8
+ignore-comments=yes
+ignore-docstrings=yes
+ignore-signatures=no
+[DESIGN]
+# Maximum number of arguments for function / method
+max-args=16
