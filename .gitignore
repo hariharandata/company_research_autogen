@@ -20,14 +20,15 @@ wheels/
 .installed.cfg
 *.egg
 *.log
-
+*.txt
+*coding/
 # Virtual Environment
 .venv/
 venv/
 ENV/
 env/
 .env/
-
+.env
 # IDE
 .idea/
 .vscode/

@@ -61,31 +61,49 @@ class CompanyResearch:
             name="Report_Agent",
             model_client=self.model_client,
             description="Generate a report based the search and results of stock analysis",
-            system_message="You are a helpful assistant that can generate a comprehensive report on a given topic based on search and stock analysis. When you done with generating the report, reply with TERMINATE.",
+            system_message=(
+                "You are a value investing analyst trained in the style of Benjamin Graham and Warren Buffett. "
+                "Use The Intelligent Investor principles to evaluate companies based on: "
+                "- Intrinsic value (DCF or earnings power) "
+                "- Margin of safety (target 20–40%) "
+                "- Financial ratios (P/E, ROE, Debt-to-Equity, EPS growth) "
+                "- Economic moat and competitive advantages "
+                "- Long-term stability and conservative assumptions. "
+                "- Respond with a recommendation: BUY, HOLD, or AVOID."
+                "Show the following information of the mentioned stock: "
+                "- stock_price (float): Mention the current stock price "
+                "- p_e_ratio (float): Mention the P/E ratio of the stock "
+                "- p_b_ratio (float): Mention the P/B ratio of the stock "
+                "- debt_to_equity_ratio (float): Mention the debt to equity ratio of the stock "
+                "- return_on_equity (float): Mention the return on equity of the stock "
+                "- free_cash_flow (float): The free cash flow of the stock "
+                "- analyst_recommendation (string): The analyst recommendation for the stock "
+                "- company_info (string): The company information "
+                "- company_news (string): The company's latest news "
+                "Always include sources. Use tables to display data. "
+                "When you are done with generating the report, reply with TERMINATE."
+            )
+            # system_message="You are a helpful assistant that can generate a comprehensive report on a given topic based on search and stock analysis and the financial_analyst agent. When you done with generating the report, reply with TERMINATE.",
         )
         return search_agent, stock_analysis_agent, report_agent
-
 
     async def execute(self, stock_name: str) -> None:
         google_search_tool, stock_analysis_tool = self.get_tools()
         search_agent, stock_analysis_agent, report_agent = self.get_agents(google_search_tool, stock_analysis_tool)
-        team = RoundRobinGroupChat([stock_analysis_agent, search_agent, report_agent], max_turns=3)
-        # team = RoundRobinGroupChat([stock_analysis_agent, report_agent], max_turns=3)
-        stream = team.run_stream(task=f"Write a financial report on {stock_name} and summarize the latest news from google.")
+        team = RoundRobinGroupChat(
+            [stock_analysis_agent, search_agent, report_agent],
+            max_turns=3
+        )
+
+        stream = team.run_stream(task=f"Write a financial report on {stock_name} using value investing principles and summarize the latest news from other agents output. ")
 
         final_report = ""
         await Console(stream)  # Display output to console
-
-        # Iterate over the stream to collect messages
-        async for message in stream:
-            if hasattr(message, "agent") and message.agent.name == "Report_Agent":
-                final_report = message.content
-        print('------------',final_report)
 
         await self.model_client.close()
 
 if __name__ == "__main__":
     import asyncio
-    stock_name = "Tanla Platforms Limited"
+    stock_name = "SUNPHARMA.NS"
     research = CompanyResearch()
     asyncio.run(research.execute(stock_name))

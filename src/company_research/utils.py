@@ -27,12 +27,53 @@ from autogen_ext.models.openai import OpenAIChatCompletionClient
 
 load_dotenv()
 
+def plot_pe_history(ticker):
+    stock = yf.Ticker(ticker)
+
+    # 1. Get historical stock prices (year-end close)
+    hist = stock.history(period="5y")
+    yearly_prices = hist['Close'].resample('Y').last()
+
+    # 2. Get annual earnings per share (EPS)
+    eps_data = stock.earnings  # DataFrame with 'Revenue' and 'Earnings'
+
+    if eps_data.empty:
+        print("No earnings data available.")
+        return
+
+    # 3. Compute P/E = Price / EPS
+    # We'll assume EPS = Net Income / Shares Outstanding (simplified)
+    # For now, use "Earnings" from `stock.earnings`, divide by some fixed shares (since shares data is limited)
+    pe_ratios = []
+    years = []
+    
+    approx_shares = 1e9  # adjust based on the company; ideally fetched dynamically
+
+    for year in eps_data.index:
+        if str(year) in yearly_prices.index.strftime('%Y'):
+            price = yearly_prices[yearly_prices.index.strftime('%Y') == str(year)].values[0]
+            earnings = eps_data.loc[year, "Earnings"]
+            eps = earnings / approx_shares  # crude estimate
+            pe = price / eps if eps != 0 else None
+            pe_ratios.append(pe)
+            years.append(year)
+
+    # 4. Plot
+    plt.figure(figsize=(8, 4))
+    plt.plot(years, pe_ratios, marker='o')
+    plt.title(f"{ticker.upper()} - Approx. P/E Ratio (Year-End)")
+    plt.xlabel("Year")
+    plt.ylabel("P/E Ratio")
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
 
 def google_search(query: str, num_results: int = 2, max_chars: int = 500) -> list:  # type: ignore[type-arg]
 
 
     api_key = os.getenv("GOOGLE_API_KEY")
     search_engine_id = os.getenv("GOOGLE_SEARCH_ENGINE_ID")
+
     if not api_key or not search_engine_id:
         raise ValueError("API key or Search Engine ID not found in environment variables")
 
@@ -123,11 +164,13 @@ def analyze_stock(ticker: str) -> dict:  # type: ignore[type-arg]
     # --- Additional Financial Metrics ---
     pe_ratio = info.get("trailingPE", None)
     pb_ratio = info.get("priceToBook", None)
+    book_value = info.get("bookValue", None)
     operating_margin = info.get("operatingMargins", None)
     debt_to_equity = info.get("debtToEquity", None)
     free_cash_flow = info.get("freeCashflow", None)
     return_on_capital = info.get("returnOnCapital", None)
     return_on_equity = info.get("returnOnEquity", None)
+
 
     # Result dictionary
     result = {
@@ -143,6 +186,7 @@ def analyze_stock(ticker: str) -> dict:  # type: ignore[type-arg]
         "volatility": volatility,
         "pe_ratio": pe_ratio,
         "pb_ratio": pb_ratio,
+        "book_value": book_value,
         "operating_margin": operating_margin,
         "total_debt": debt_to_equity,
         "free_cash_flow": free_cash_flow,
@@ -175,6 +219,7 @@ def analyze_stock(ticker: str) -> dict:  # type: ignore[type-arg]
         "Free Cash Flow": free_cash_flow,
         "Return on Capital": return_on_capital,
         "Return on Equity": return_on_equity,
+        "Book Value": book_value,
     }
     metrics_df = pd.DataFrame(list(metrics.items()), columns=["Metric", "Value"])
     table = plt.table(cellText=metrics_df.values,
@@ -190,5 +235,6 @@ def analyze_stock(ticker: str) -> dict:  # type: ignore[type-arg]
     plt.savefig(plot_file_path)
     print(f"Plot saved as {plot_file_path}")
     result["plot_file_path"] = plot_file_path
+    # plot_pe_history(ticker)
 
     return result
