@@ -27,6 +27,8 @@ endif
 BROWSER := ${PYTHON_CMD} -c "$$BROWSER_PYSCRIPT"
 run:
 	${PYTHON_CMD} ${ROOT}/main.py
+run2:
+	${PYTHON_CMD} ${ROOT}/main2.py
 help:
 	@python -c "$$PRINT_HELP_PYSCRIPT" < $(MAKEFILE_LIST)
 lint: ## run pylint

@@ -1,11 +1,15 @@
 # imports
 import os
 import time
+import logging
 
 import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 
+# Set matplotlib backend to non-interactive to avoid GUI issues
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend
 
 import os
 from datetime import datetime, timedelta
@@ -15,66 +19,57 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 from pytz import timezone  # type: ignore
-import matplotlib
-matplotlib.use('Agg')
-from autogen_agentchat.agents import AssistantAgent
-from autogen_agentchat.conditions import TextMentionTermination
-from autogen_agentchat.teams import RoundRobinGroupChat
-from autogen_agentchat.ui import Console
-from autogen_core.tools import FunctionTool
-from autogen_ext.models.openai import OpenAIChatCompletionClient
+import matplotlib.pyplot as plt
 
+from logger.log_config import setup_logging
+
+# Setup logging
+setup_logging()
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-def plot_pe_history(ticker):
-    stock = yf.Ticker(ticker)
 
-    # 1. Get historical stock prices (year-end close)
-    hist = stock.history(period="5y")
-    yearly_prices = hist['Close'].resample('Y').last()
-
-    # 2. Get annual earnings per share (EPS)
-    eps_data = stock.earnings  # DataFrame with 'Revenue' and 'Earnings'
-
-    if eps_data.empty:
-        print("No earnings data available.")
-        return
-
-    # 3. Compute P/E = Price / EPS
-    # We'll assume EPS = Net Income / Shares Outstanding (simplified)
-    # For now, use "Earnings" from `stock.earnings`, divide by some fixed shares (since shares data is limited)
-    pe_ratios = []
-    years = []
+def google_search(query: str, num_results: int = 2, max_chars: int = 500) -> list:
+    """
+    Perform a Google search and retrieve enriched results with page content.
     
-    approx_shares = 1e9  # adjust based on the company; ideally fetched dynamically
-
-    for year in eps_data.index:
-        if str(year) in yearly_prices.index.strftime('%Y'):
-            price = yearly_prices[yearly_prices.index.strftime('%Y') == str(year)].values[0]
-            earnings = eps_data.loc[year, "Earnings"]
-            eps = earnings / approx_shares  # crude estimate
-            pe = price / eps if eps != 0 else None
-            pe_ratios.append(pe)
-            years.append(year)
-
-    # 4. Plot
-    plt.figure(figsize=(8, 4))
-    plt.plot(years, pe_ratios, marker='o')
-    plt.title(f"{ticker.upper()} - Approx. P/E Ratio (Year-End)")
-    plt.xlabel("Year")
-    plt.ylabel("P/E Ratio")
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
-
-def google_search(query: str, num_results: int = 2, max_chars: int = 500) -> list:  # type: ignore[type-arg]
-
-
+    This function uses the Google Custom Search API to search for information
+    and then fetches the actual content from the returned URLs to provide
+    more comprehensive search results.
+    
+    Args:
+        query (str): The search query to execute.
+        num_results (int, optional): Number of search results to retrieve. 
+                                   Defaults to 2.
+        max_chars (int, optional): Maximum number of characters to extract 
+                                  from each page's content. Defaults to 500.
+    
+    Returns:
+        list: A list of dictionaries containing search results. Each dictionary
+              contains:
+              - title (str): The page title
+              - link (str): The page URL
+              - snippet (str): The search result snippet
+              - body (str): The extracted page content (limited to max_chars)
+    
+    Raises:
+        ValueError: If Google API key or Search Engine ID are not found in
+                   environment variables.
+        Exception: If the Google API request fails (non-200 status code).
+    
+    Example:
+        >>> results = google_search("Apple Inc financial news", num_results=3)
+        >>> print(f"Found {len(results)} results")
+        Found 3 results
+    """
+    logger.info(f"Starting Google search for query: {query}")
+    
     api_key = os.getenv("GOOGLE_API_KEY")
     search_engine_id = os.getenv("GOOGLE_SEARCH_ENGINE_ID")
 
     if not api_key or not search_engine_id:
+        logger.error("API key or Search Engine ID not found in environment variables")
         raise ValueError("API key or Search Engine ID not found in environment variables")
 
     url = "https://customsearch.googleapis.com/customsearch/v1"
@@ -83,12 +78,24 @@ def google_search(query: str, num_results: int = 2, max_chars: int = 500) -> lis
     response = requests.get(url, params=params)
 
     if response.status_code != 200:
-        print(response.json())
+        logger.error(f"Error in API request: {response.status_code}")
+        logger.error(response.json())
         raise Exception(f"Error in API request: {response.status_code}")
 
     results = response.json().get("items", [])
+    logger.debug(f"Found {len(results)} search results")
 
     def get_page_content(url: str) -> str:
+        """
+        Extract text content from a web page.
+        
+        Args:
+            url (str): The URL to fetch content from.
+        
+        Returns:
+            str: The extracted text content, limited to max_chars characters.
+                 Returns empty string if fetching fails.
+        """
         try:
             response = requests.get(url, timeout=10)
             soup = BeautifulSoup(response.content, "html.parser")
@@ -101,7 +108,7 @@ def google_search(query: str, num_results: int = 2, max_chars: int = 500) -> lis
                 content += " " + word
             return content.strip()
         except Exception as e:
-            print(f"Error fetching {url}: {str(e)}")
+            logger.warning(f"Error fetching {url}: {str(e)}")
             return ""
 
     enriched_results = []
@@ -112,10 +119,60 @@ def google_search(query: str, num_results: int = 2, max_chars: int = 500) -> lis
         )
         time.sleep(1)  # Be respectful to the servers
 
+    logger.info(f"Successfully processed {len(enriched_results)} search results")
     return enriched_results
 
 
-def analyze_stock(ticker: str) -> dict:  # type: ignore[type-arg]
+def analyze_stock(ticker: str) -> dict:
+    """
+    Perform comprehensive stock analysis and generate visualization.
+    
+    This function retrieves historical stock data, calculates various financial
+    metrics, and generates a comprehensive analysis including price trends,
+    moving averages, volatility, and key financial ratios. It also creates
+    a visualization plot saved to disk.
+    
+    Args:
+        ticker (str): The stock ticker symbol to analyze (e.g., "AAPL", "MSFT").
+    
+    Returns:
+        dict: A dictionary containing comprehensive stock analysis data including:
+              - ticker (str): The analyzed ticker symbol
+              - current_price (float): Current stock price
+              - 52_week_high (float): 52-week high price
+              - 52_week_low (float): 52-week low price
+              - 50_day_ma (float): 50-day moving average
+              - 200_day_ma (float): 200-day moving average
+              - ytd_price_change (float): Year-to-date price change
+              - ytd_percent_change (float): Year-to-date percentage change
+              - trend (str): Price trend ("Upward", "Downward", "Neutral")
+              - volatility (float): Annualized volatility
+              - pe_ratio (float): Price-to-Earnings ratio
+              - pb_ratio (float): Price-to-Book ratio
+              - book_value (float): Book value per share
+              - operating_margin (float): Operating margin
+              - total_debt (float): Debt-to-equity ratio
+              - free_cash_flow (float): Free cash flow
+              - return_on_capital (float): Return on capital
+              - return_on_equity (float): Return on equity
+              - plot_file_path (str): Path to the generated plot image
+    
+    Raises:
+        Exception: If there's an error retrieving stock data or generating the plot.
+    
+    Example:
+        >>> analysis = analyze_stock("AAPL")
+        >>> print(f"Current price: ${analysis['current_price']:.2f}")
+        >>> print(f"P/E ratio: {analysis['pe_ratio']:.2f}")
+        Current price: $150.25
+        P/E ratio: 25.30
+    
+    Note:
+        The function generates a plot saved as "{ticker}_stockprice.png" in the
+        "coding" directory, showing price history with 50-day and 200-day
+        moving averages, along with a table of financial metrics.
+    """
+    logger.info(f"Starting stock analysis for ticker: {ticker}")
 
     stock = yf.Ticker(ticker)
 
@@ -126,7 +183,11 @@ def analyze_stock(ticker: str) -> dict:  # type: ignore[type-arg]
 
     # Ensure we have data
     if hist.empty:
+        logger.error(f"No historical data available for ticker: {ticker}")
         return {"error": "No historical data available for the specified ticker."}
+    
+    logger.debug(f"Retrieved {len(hist)} days of historical data for {ticker}")
+    
     info = stock.info
     # Compute basic statistics and additional metrics
     current_price = info.get("currentPrice", hist["Close"].iloc[-1])
@@ -171,6 +232,7 @@ def analyze_stock(ticker: str) -> dict:  # type: ignore[type-arg]
     return_on_capital = info.get("returnOnCapital", None)
     return_on_equity = info.get("returnOnEquity", None)
 
+    logger.debug(f"Calculated financial metrics for {ticker}")
 
     # Result dictionary
     result = {
@@ -200,6 +262,7 @@ def analyze_stock(ticker: str) -> dict:  # type: ignore[type-arg]
             result[key] = value.item()
 
     # Generate plot
+    logger.debug(f"Generating stock price plot for {ticker}")
     plt.figure(figsize=(12, 6))
     plt.plot(hist.index, hist["Close"], label="Close Price")
     plt.plot(hist.index, hist["Close"].rolling(window=50).mean(), label="50-day MA")
@@ -233,8 +296,8 @@ def analyze_stock(ticker: str) -> dict:  # type: ignore[type-arg]
     os.makedirs("coding", exist_ok=True)
     plot_file_path = f"coding/{ticker}_stockprice.png"
     plt.savefig(plot_file_path)
-    print(f"Plot saved as {plot_file_path}")
+    logger.info(f"Stock analysis plot saved as {plot_file_path}")
     result["plot_file_path"] = plot_file_path
-    # plot_pe_history(ticker)
 
+    logger.info(f"Stock analysis completed successfully for {ticker}")
     return result
