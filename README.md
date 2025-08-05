@@ -343,13 +343,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Yahoo Finance**: Financial data API
 - **Google**: Search API for market research
 
-## 📞 Support
-
-For issues and questions:
-1. Check the [Issues](https://github.com/your-repo/issues) page
-2. Review the logging output for error details
-3. Ensure all environment variables are set correctly
-
 ---
 
 *This system is designed for educational and research purposes. Always consult with qualified financial advisors before making investment decisions.*
