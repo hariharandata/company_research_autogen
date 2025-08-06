@@ -12,6 +12,26 @@ authors = [
 requires-python = ">=3.8"
 readme = "README.md"
 license = { text = "MIT" }
+dependencies = [
+    "requests",
+    "beautifulsoup4",
+    "python-dotenv",
+    "matplotlib",
+    "numpy",
+    "pandas",
+    "yfinance",
+    "pytz",
+    "reportlab",
+    "autogen",           # If available on PyPI
+    "autogen_agentchat", # If available on PyPI
+    "autogen_core",      # If available on PyPI
+    "autogen_ext"        # If available on PyPI
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest"
+]
 
 [tool.setuptools]
 package-dir = {"" = "src"}

@@ -170,7 +170,7 @@ class CompanyResearch:
 
 if __name__ == "__main__":
     import asyncio
-    stock_name = "ITC.NS"
+    stock_name = "Eli Lilly"
     logger.info("Starting company research application")
     research = CompanyResearch()
     asyncio.run(research.execute(stock_name))
